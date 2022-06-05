@@ -1,65 +1,202 @@
-#Association Rule Based Recommender System
+############################################
+# ASSOCIATION RULE LEARNING (BİRLİKTELİK KURALI ÖĞRENİMİ)
+############################################
 
-####################
-#İŞ PROBLEMİ
-####################
-#Türkiye’nin en büyük online hizmet platformu olan Armut, hizmet verenler ile hizmet almak isteyenleri buluşturmaktadır.
-#Bilgisayarın veya akıllı telefonunun üzerinden birkaç dokunuşla temizlik, tadilat, nakliyat gibi hizmetlere kolayca ulaşılmasını sağlamaktadır.
-#Hizmet alan kullanıcıları ve bu kullanıcıların almış oldukları servis ve kategorileri içeren veri setini kullanarak Association Rule Learning ile ürün tavsiye sistemi oluşturulmak istenmektedir
-
-####################
-#VERİ SETİ
-####################
-#Veri seti müşterilerin aldıkları servislerden ve bu servislerin kategorilerinden oluşmaktadır. Alınan her hizmetin tarih ve saat bilgisini içermektedir
-#UserId: Müşteri numarası
-#ServiceId: Her kategoriye ait anonimleştirilmiş servislerdir. (Örnek : Temizlik kategorisi altında koltuk yıkama servisi) Bir ServiceId farklı kategoriler altında bulanabilir ve farklı kategoriler altında farklı servisleri ifade eder.
-#(Örnek: CategoryId’si 7 ServiceId’si 4 olan hizmet petek temizliği iken CategoryId’si 2 ServiceId’si 4 olan hizmet mobilya montaj)
-#CategoryId: Anonimleştirilmiş kategorilerdir. (Örnek : Temizlik, nakliyat, tadilat kategorisi)
-#CreateDate: Hizmetin satın alındığı tarih
-
+# 1. Veri Ön İşleme
+!pip install mlxtend
 import pandas as pd
-pd.set_option("display.max_columns", None)
+pd.set_option('display.max_columns', None)
+# pd.set_option('display.max_rows', None)
+pd.set_option('display.width', 500)
+# çıktının tek bir satırda olmasını sağlar.
+pd.set_option('display.expand_frame_repr', False)
 from mlxtend.frequent_patterns import apriori, association_rules
 
-####################
-#VERİYİ HAZIRLAMA
-####################
-df_ = pd.read_csv("pythonProject/tavsiye sistemleri/ödev 1/armut_data.csv")
+# 2. ARL Veri Yapısını Hazırlama (Invoice-Product Matrix)
+# 3. Birliktelik Kurallarının Çıkarılması
+# 4. Çalışmanın Scriptini Hazırlama
+# 5. Sepet Aşamasındaki Kullanıcılara Ürün Önerisinde Bulunmak
+
+############################################
+# 1. Veri Ön İşleme
+############################################
+
+# https://archive.ics.uci.edu/ml/datasets/Online+Retail+II
+
+df_ = pd.read_excel("online_retail_II.xlsx",
+                    sheet_name="Year 2010-2011")
 df = df_.copy()
 df.head()
-
-df["Hizmet"] = [str(row[1]) + "_" + str(row[2]) for row in df.values]
-df.head()
-
-df["CreateDate"] = pd.to_datetime(df["CreateDate"])
-df["NEW_DATE"] = df["CreateDate"].dt.strftime("%Y-%m")
-
-df["SepetID"] = [str(row[0]) + "_" + str(row[5]) for row in df.values]
-df.head()
+# pip install openpyxl
+# df_ = pd.read_excel("datasets/online_retail_II.xlsx",
+#                     sheet_name="Year 2010-2011", engine="openpyxl")
 
 
-####################
-#BİRLİKTELİK KURALLARINI ÜRETME VE ÖNERİDE BULUNMA
-####################
+df.describe().T
+df.isnull().sum()
+df.shape
 
-invoice_product_df = df.groupby(["SepetID", "Hizmet"])["Hizmet"].count().unstack().fillna(0).applymap(lambda x:1 if x > 0 else 0)
 
-invoice_product_df.head()
+def outlier_thresholds(dataframe, variable):
+    quartile1 = dataframe[variable].quantile(0.01)
+    quartile3 = dataframe[variable].quantile(0.99)
+    interquantile_range = quartile3 - quartile1
+    up_limit = quartile3 + 1.5 * interquantile_range
+    low_limit = quartile1 - 1.5 * interquantile_range
+    return low_limit, up_limit
 
-frequent_itemsets = apriori(invoice_product_df, min_support = 0.01, use_colnames = True)
-rules = association_rules(frequent_itemsets, metric="support", min_threshold=0.01)
-rules.head()
+def replace_with_thresholds(dataframe, variable):
+    low_limit, up_limit = outlier_thresholds(dataframe, variable)
+    dataframe.loc[(dataframe[variable] < low_limit), variable] = low_limit
+    dataframe.loc[(dataframe[variable] > up_limit), variable] = up_limit
 
-#İşlemi yapması için bir fonksiyon tanımladım
+def retail_data_prep(dataframe):
+    dataframe.dropna(inplace=True)
+    dataframe = dataframe[~dataframe["Invoice"].str.contains("C", na=False)]
+    dataframe = dataframe[dataframe["Quantity"] > 0]
+    dataframe = dataframe[dataframe["Price"] > 0]
+    replace_with_thresholds(dataframe, "Quantity")
+    replace_with_thresholds(dataframe, "Price")
+    return dataframe
+
+df = retail_data_prep(df)
+df.isnull().sum()
+df.describe().T
+
+
+############################################
+# 2. ARL Veri Yapısını Hazırlama (Invoice-Product Matrix)
+############################################
+
+df_fr = df[df['Country'] == "France"]
+
+
+def create_invoice_product_df(dataframe, id=False):
+    if id:
+        return dataframe.groupby(['Invoice', "StockCode"])['Quantity'].sum().unstack().fillna(0). \
+            applymap(lambda x: 1 if x > 0 else 0)
+    else:
+        return dataframe.groupby(['Invoice', 'Description'])['Quantity'].sum().unstack().fillna(0). \
+            applymap(lambda x: 1 if x > 0 else 0)
+
+fr_inv_pro_df = create_invoice_product_df(df_fr)
+
+fr_inv_pro_df = create_invoice_product_df(df_fr, id=True)
+
+
+def check_id(dataframe, stock_code):
+    product_name = dataframe[dataframe["StockCode"] == stock_code][["Description"]].values[0].tolist()
+    print(product_name)
+
+
+check_id(df_fr, 10120)
+
+############################################
+# 3. Birliktelik Kurallarının Çıkarılması
+############################################
+
+frequent_itemsets = apriori(fr_inv_pro_df, min_support=0.01, use_colnames=True)
+
+frequent_itemsets.sort_values("support", ascending=False)
+
+rules = association_rules(frequent_itemsets,metric="support",min_threshold=0.01)
+
+
+############################################
+# 4. Çalışmanın Scriptini Hazırlama
+############################################
+
+def outlier_thresholds(dataframe, variable):
+    quartile1 = dataframe[variable].quantile(0.01)
+    quartile3 = dataframe[variable].quantile(0.99)
+    interquantile_range = quartile3 - quartile1
+    up_limit = quartile3 + 1.5 * interquantile_range
+    low_limit = quartile1 - 1.5 * interquantile_range
+    return low_limit, up_limit
+
+def replace_with_thresholds(dataframe, variable):
+    low_limit, up_limit = outlier_thresholds(dataframe, variable)
+    dataframe.loc[(dataframe[variable] < low_limit), variable] = low_limit
+    dataframe.loc[(dataframe[variable] > up_limit), variable] = up_limit
+
+def retail_data_prep(dataframe):
+    dataframe.dropna(inplace=True)
+    dataframe = dataframe[~dataframe["Invoice"].str.contains("C", na=False)]
+    dataframe = dataframe[dataframe["Quantity"] > 0]
+    dataframe = dataframe[dataframe["Price"] > 0]
+    replace_with_thresholds(dataframe, "Quantity")
+    replace_with_thresholds(dataframe, "Price")
+    return dataframe
+
+
+def create_invoice_product_df(dataframe, id=False):
+    if id:
+        return dataframe.groupby(['Invoice', "StockCode"])['Quantity'].sum().unstack().fillna(0). \
+            applymap(lambda x: 1 if x > 0 else 0)
+    else:
+        return dataframe.groupby(['Invoice', 'Description'])['Quantity'].sum().unstack().fillna(0). \
+            applymap(lambda x: 1 if x > 0 else 0)
+
+
+def check_id(dataframe, stock_code):
+    product_name = dataframe[dataframe["StockCode"] == stock_code][["Description"]].values[0].tolist()
+    print(product_name)
+
+
+def create_rules(dataframe, id=True, country="France"):
+    dataframe = dataframe[dataframe['Country'] == country]
+    dataframe = create_invoice_product_df(dataframe, id)
+    frequent_itemsets = apriori(dataframe, min_support=0.01, use_colnames=True)
+    rules = association_rules(frequent_itemsets, metric="support", min_threshold=0.01)
+    return rules
+
+df = df_.copy()
+
+df = retail_data_prep(df)
+rules = create_rules(df)
+
+rules[(rules["support"]>0.05) & (rules["confidence"]>0.1) & (rules["lift"]>5)]. \
+sort_values("confidence", ascending=False)
+
+############################################
+# 5. Sepet Aşamasındaki Kullanıcılara Ürün Önerisinde Bulunmak
+############################################
+
+# Örnek:
+# Kullanıcı örnek ürün id: 22492
+
+product_id = 22492
+check_id(df, product_id)
+
+sorted_rules = rules.sort_values("lift", ascending=False)
+
+recommendation_list = []
+
+for i, product in enumerate(sorted_rules["antecedents"]):
+    for j in list(product):
+        if j == product_id:
+            recommendation_list.append(list(sorted_rules.iloc[i]["consequents"])[0])
+
+recommendation_list[0:3]
+
+check_id(df, 22326)
+
 def arl_recommender(rules_df, product_id, rec_count=1):
     sorted_rules = rules_df.sort_values("lift", ascending=False)
     recommendation_list = []
-    for i, product in sorted_rules["antecedents"].items():
+    for i, product in enumerate(sorted_rules["antecedents"]):
         for j in list(product):
             if j == product_id:
-                recommendation_list.append(list(sorted_rules.iloc[i]["consequents"]))
-    recommendation_list = list({item for item_list in recommendation_list for item in item_list})
-    return recommendation_list[:rec_count]
+                recommendation_list.append(list(sorted_rules.iloc[i]["consequents"])[0])
 
-#Fonksiyonu kullanarak son 1 ay içerisinde 2_0 hizmetini alan bir kullanıcıya hizmet önerisinde bulundum.
-arl_recommender(rules, "2_0", 1)
+    return recommendation_list[0:rec_count]
+
+
+arl_recommender(rules, 22492, 1)
+arl_recommender(rules, 22492, 2)
+arl_recommender(rules, 22492, 3)
+
+
+
+
+
