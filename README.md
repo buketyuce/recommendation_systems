@@ -1,6 +1,8 @@
-# Tavsiye Sistemleri 
+## Tavsiye Sistemleri ##
+
 
 Tavsiye sistemleri kullanıcıların ilgi alanına göre, sonraki hareketlerini tahmin ederek uygulama kullanımını sürdürmek amacıyla düzenlenen algoritma yapılarıdır.
+
 
 # 1.Association_Rule_Learning_ARMUT
 
@@ -28,3 +30,11 @@ Online Retail II isimli İngiltere merkezli online bir satış mağazasının 01
 
 https://archive.ics.uci.edu/ml/datasets/Online+Retail+II
 
+
+# 4.content_based_recommender
+
+Yeni kurulmuş olan bir online film izleme platformu kullanıcılarına film önerilerinde bulunmak istemektedir.
+
+Kullanıcıların login oranı çok düşük olduğu için kullanıcı alışkanlıklarını toplayamamaktadır. Bu sebeple iş birlikçi filtreleme yöntemleri ile ürün önerileri geliştirememektedir.
+
+Fakat kullanıcıların tarayıcıdaki izlerinden hangi filmleri izlediklerini bilmektedir. Bu bilgiye göre film önerilerinde bulununuz.
