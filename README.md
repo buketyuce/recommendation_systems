@@ -37,4 +37,4 @@ Yeni kurulmuş olan bir online film izleme platformu kullanıcılarına film ön
 
 Kullanıcıların login oranı çok düşük olduğu için kullanıcı alışkanlıklarını toplayamamaktadır. Bu sebeple iş birlikçi filtreleme yöntemleri ile ürün önerileri geliştirememektedir.
 
-Fakat kullanıcıların tarayıcıdaki izlerinden hangi filmleri izlediklerini bilmektedir. Bu bilgiye göre film önerilerinde bulununuz.
+Fakat kullanıcıların tarayıcıdaki izlerinden hangi filmleri izlediklerini bilmektedir. Bu bilgiye göre film önerilerinde bulundum.
